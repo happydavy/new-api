@@ -21,10 +21,10 @@ export default defineConfig({
         });
       },
     },
-    react(),
-    vitePluginSemi({
-      cssLayer: true
-    })
+    react()
+    // vitePluginSemi({
+    //   cssLayer: true
+    // })
   ],
   optimizeDeps: {
     force: true,

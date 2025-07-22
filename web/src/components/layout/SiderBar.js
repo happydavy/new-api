@@ -70,17 +70,13 @@ const SiderBar = () => {
         text: t('绘图日志'),
         itemKey: 'midjourney',
         to: '/midjourney',
-        className:
-          localStorage.getItem('enable_drawing') === 'true'
-            ? ''
-            : 'tableHiddle',
+        className: 'tableHiddle',
       },
       {
         text: t('任务日志'),
         itemKey: 'task',
         to: '/task',
-        className:
-          localStorage.getItem('enable_task') === 'true' ? '' : 'tableHiddle',
+        className: 'tableHiddle',
       },
     ],
     [
