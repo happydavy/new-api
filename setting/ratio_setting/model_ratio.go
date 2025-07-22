@@ -231,7 +231,9 @@ var defaultModelPrice = map[string]float64{
 	"dall-e-3":                0.04,
 	"imagen-3.0-generate-002": 0.03,
 	"gpt-4-gizmo-*":           0.1,
+	"mj_video":                0.8,
 	"mj_imagine":              0.1,
+	"mj_edits":                0.1,
 	"mj_variation":            0.1,
 	"mj_reroll":               0.1,
 	"mj_blend":                0.1,
@@ -367,7 +369,7 @@ func handleThinkingBudgetModel(name, prefix, wildcard string) string {
 	return name
 }
 
-func GetModelRatio(name string) (float64, bool) {
+func GetModelRatio(name string) (float64, bool, string) {
 	modelRatioMapMutex.RLock()
 	defer modelRatioMapMutex.RUnlock()
 
@@ -378,9 +380,9 @@ func GetModelRatio(name string) (float64, bool) {
 	}
 	ratio, ok := modelRatioMap[name]
 	if !ok {
-		return 37.5, operation_setting.SelfUseModeEnabled
+		return 37.5, operation_setting.SelfUseModeEnabled, name
 	}
-	return ratio, true
+	return ratio, true, name
 }
 
 func DefaultModelRatio2JSONString() string {

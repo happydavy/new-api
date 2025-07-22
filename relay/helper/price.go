@@ -3,7 +3,6 @@ package helper
 import (
 	"fmt"
 	"one-api/common"
-	constant2 "one-api/constant"
 	relaycommon "one-api/relay/common"
 	"one-api/setting/ratio_setting"
 
@@ -80,17 +79,15 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 			preConsumedTokens = promptTokens + maxTokens
 		}
 		var success bool
-		modelRatio, success = ratio_setting.GetModelRatio(info.OriginModelName)
+		var matchName string
+		modelRatio, success, matchName = ratio_setting.GetModelRatio(info.OriginModelName)
 		if !success {
 			acceptUnsetRatio := false
-			if accept, ok := info.UserSetting[constant2.UserAcceptUnsetRatioModel]; ok {
-				b, ok := accept.(bool)
-				if ok {
-					acceptUnsetRatio = b
-				}
+			if info.UserSetting.AcceptUnsetRatioModel {
+				acceptUnsetRatio = true
 			}
 			if !acceptUnsetRatio {
-				return PriceData{}, fmt.Errorf("模型 %s 倍率或价格未配置，请联系管理员设置或开始自用模式；Model %s ratio or price not set, please set or start self-use mode", info.OriginModelName, info.OriginModelName)
+				return PriceData{}, fmt.Errorf("模型 %s 倍率或价格未配置，请联系管理员设置或开始自用模式；Model %s ratio or price not set, please set or start self-use mode", matchName, matchName)
 			}
 		}
 		completionRatio = ratio_setting.GetCompletionRatio(info.OriginModelName)
@@ -156,7 +153,7 @@ func ContainPriceOrRatio(modelName string) bool {
 	if ok {
 		return true
 	}
-	_, ok = ratio_setting.GetModelRatio(modelName)
+	_, ok, _ = ratio_setting.GetModelRatio(modelName)
 	if ok {
 		return true
 	}

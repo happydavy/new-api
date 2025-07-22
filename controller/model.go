@@ -130,7 +130,7 @@ func ListModels(c *gin.Context) {
 		}
 	} else {
 		userId := c.GetInt("id")
-		userGroup, err := model.GetUserGroup(userId, true)
+		userGroup, err := model.GetUserGroup(userId, false)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
@@ -139,7 +139,7 @@ func ListModels(c *gin.Context) {
 			return
 		}
 		group := userGroup
-		tokenGroup := common.GetContextKeyString(c, constant.ContextKeyUserGroup)
+		tokenGroup := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
 		if tokenGroup != "" {
 			group = tokenGroup
 		}

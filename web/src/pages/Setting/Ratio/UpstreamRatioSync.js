@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   CheckCircle,
 } from 'lucide-react';
-import { API, showError, showSuccess, showWarning, stringToColor, isMobile } from '../../../helpers';
+import { API, showError, showSuccess, showWarning, stringToColor } from '../../../helpers';
+import { useIsMobile } from '../../../hooks/useIsMobile.js';
 import { DEFAULT_ENDPOINT } from '../../../constants';
 import { useTranslation } from 'react-i18next';
 import {
@@ -28,6 +29,7 @@ import {
 import ChannelSelectorModal from '../../../components/settings/ChannelSelectorModal';
 
 function ConflictConfirmModal({ t, visible, items, onOk, onCancel }) {
+  const isMobile = useIsMobile();
   const columns = [
     { title: t('渠道'), dataIndex: 'channel' },
     { title: t('模型'), dataIndex: 'model' },
@@ -49,7 +51,7 @@ function ConflictConfirmModal({ t, visible, items, onOk, onCancel }) {
       visible={visible}
       onCancel={onCancel}
       onOk={onOk}
-      size={isMobile() ? 'full-width' : 'large'}
+      size={isMobile ? 'full-width' : 'large'}
     >
       <Table columns={columns} dataSource={items} pagination={false} size="small" />
     </Modal>
@@ -61,6 +63,7 @@ export default function UpstreamRatioSync(props) {
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   // 渠道选择相关
   const [allChannels, setAllChannels] = useState([]);
@@ -373,7 +376,7 @@ export default function UpstreamRatioSync(props) {
         <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto order-2 md:order-1">
           <Button
             icon={<RefreshCcw size={14} />}
-            className="!rounded-full w-full md:w-auto mt-2"
+            className="w-full md:w-auto mt-2"
             onClick={() => {
               setModalVisible(true);
               if (allChannels.length === 0) {
@@ -393,7 +396,7 @@ export default function UpstreamRatioSync(props) {
                 type='secondary'
                 onClick={applySync}
                 disabled={!hasSelections}
-                className="!rounded-full w-full md:w-auto mt-2"
+                className="w-full md:w-auto mt-2"
               >
                 {t('应用同步')}
               </Button>
@@ -406,7 +409,7 @@ export default function UpstreamRatioSync(props) {
               placeholder={t('搜索模型名称')}
               value={searchKeyword}
               onChange={setSearchKeyword}
-              className="!rounded-full w-full sm:w-64"
+              className="w-full sm:w-64"
               showClear
             />
 
@@ -414,7 +417,7 @@ export default function UpstreamRatioSync(props) {
               placeholder={t('按倍率类型筛选')}
               value={ratioTypeFilter}
               onChange={setRatioTypeFilter}
-              className="!rounded-full w-full sm:w-48"
+              className="w-full sm:w-48"
               showClear
               onClear={() => setRatioTypeFilter('')}
             >
@@ -704,7 +707,6 @@ export default function UpstreamRatioSync(props) {
         scroll={{ x: 'max-content' }}
         size='middle'
         loading={loading || syncLoading}
-        className="rounded-xl overflow-hidden"
       />
     );
   };

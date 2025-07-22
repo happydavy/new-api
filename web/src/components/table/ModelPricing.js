@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useMemo, useState } from 'react';
-import { API, copy, showError, showInfo, showSuccess, getModelCategories, renderModelTag } from '../../helpers';
+import { API, copy, showError, showInfo, showSuccess, getModelCategories, renderModelTag, stringToColor } from '../../helpers';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -16,7 +16,9 @@ import {
   Card,
   Tabs,
   TabPane,
-  Empty
+  Empty,
+  Switch,
+  Select
 } from '@douyinfe/semi-ui';
 import {
   IllustrationNoResult,
@@ -32,6 +34,7 @@ import {
 } from '@douyinfe/semi-icons';
 import { UserContext } from '../../context/User/index.js';
 import { AlertCircle } from 'lucide-react';
+import { StatusContext } from '../../context/Status/index.js';
 
 const ModelPricing = () => {
   const { t } = useTranslation();
@@ -43,6 +46,14 @@ const ModelPricing = () => {
   const [selectedGroup, setSelectedGroup] = useState('default');
   const [activeKey, setActiveKey] = useState('all');
   const [pageSize, setPageSize] = useState(10);
+
+  const [currency, setCurrency] = useState('USD');
+  const [showWithRecharge, setShowWithRecharge] = useState(false);
+  const [tokenUnit, setTokenUnit] = useState('M');
+  const [statusState] = useContext(StatusContext);
+  // 充值汇率（price）与美元兑人民币汇率（usd_exchange_rate）
+  const priceRate = useMemo(() => statusState?.status?.price ?? 1, [statusState]);
+  const usdExchangeRate = useMemo(() => statusState?.status?.usd_exchange_rate ?? priceRate, [statusState, priceRate]);
 
   const rowSelection = useMemo(
     () => ({
@@ -76,13 +87,13 @@ const ModelPricing = () => {
     switch (type) {
       case 1:
         return (
-          <Tag color='teal' size='large' shape='circle'>
+          <Tag color='teal' shape='circle'>
             {t('按次计费')}
           </Tag>
         );
       case 0:
         return (
-          <Tag color='violet' size='large' shape='circle'>
+          <Tag color='violet' shape='circle'>
             {t('按量计费')}
           </Tag>
         );
@@ -106,6 +117,37 @@ const ModelPricing = () => {
     ) : null;
   }
 
+  function renderSupportedEndpoints(endpoints) {
+    if (!endpoints || endpoints.length === 0) {
+      return null;
+    }
+    return (
+      <Space wrap>
+        {endpoints.map((endpoint, idx) => (
+          <Tag
+            key={endpoint}
+            color={stringToColor(endpoint)}
+            shape='circle'
+          >
+            {endpoint}
+          </Tag>
+        ))}
+      </Space>
+    );
+  }
+
+  const displayPrice = (usdPrice) => {
+    let priceInUSD = usdPrice;
+    if (showWithRecharge) {
+      priceInUSD = usdPrice * priceRate / usdExchangeRate;
+    }
+
+    if (currency === 'CNY') {
+      return `¥${(priceInUSD * usdExchangeRate).toFixed(3)}`;
+    }
+    return `$${priceInUSD.toFixed(3)}`;
+  };
+
   const columns = [
     {
       title: t('可用性'),
@@ -119,6 +161,13 @@ const ModelPricing = () => {
         return Number(aAvailable) - Number(bAvailable);
       },
       defaultSortOrder: 'descend',
+    },
+    {
+      title: t('可用端点类型'),
+      dataIndex: 'supported_endpoint_types',
+      render: (text, record, index) => {
+        return renderSupportedEndpoints(text);
+      },
     },
     {
       title: t('模型名称'),
@@ -152,7 +201,7 @@ const ModelPricing = () => {
               if (usableGroup[group]) {
                 if (group === selectedGroup) {
                   return (
-                    <Tag color='blue' size='large' shape='circle' prefixIcon={<IconVerify />}>
+                    <Tag color='blue' shape='circle' prefixIcon={<IconVerify />}>
                       {group}
                     </Tag>
                   );
@@ -160,7 +209,6 @@ const ModelPricing = () => {
                   return (
                     <Tag
                       color='blue'
-                      size='large'
                       shape='circle'
                       onClick={() => {
                         setSelectedGroup(group);
@@ -220,33 +268,54 @@ const ModelPricing = () => {
       },
     },
     {
-      title: t('模型价格'),
+      title: (
+        <div className="flex items-center space-x-2">
+          <span>{t('模型价格')}</span>
+          {/* 计费单位切换 */}
+          <Switch
+            checked={tokenUnit === 'K'}
+            onChange={(checked) => setTokenUnit(checked ? 'K' : 'M')}
+            checkedText="K"
+            uncheckedText="M"
+          />
+        </div>
+      ),
       dataIndex: 'model_price',
       render: (text, record, index) => {
         let content = text;
         if (record.quota_type === 0) {
-          let inputRatioPrice =
-            record.model_ratio * 2 * groupRatio[selectedGroup];
-          let completionRatioPrice =
-            record.model_ratio *
-            record.completion_ratio *
-            2 *
-            groupRatio[selectedGroup];
+          let inputRatioPriceUSD = record.model_ratio * 2 * groupRatio[selectedGroup];
+          let completionRatioPriceUSD =
+            record.model_ratio * record.completion_ratio * 2 * groupRatio[selectedGroup];
+
+          const unitDivisor = tokenUnit === 'K' ? 1000 : 1;
+          const unitLabel = tokenUnit === 'K' ? 'K' : 'M';
+
+          let displayInput = displayPrice(inputRatioPriceUSD);
+          let displayCompletion = displayPrice(completionRatioPriceUSD);
+
+          const divisor = unitDivisor;
+          const numInput = parseFloat(displayInput.replace(/[^0-9.]/g, '')) / divisor;
+          const numCompletion = parseFloat(displayCompletion.replace(/[^0-9.]/g, '')) / divisor;
+
+          displayInput = `${currency === 'CNY' ? '¥' : '$'}${numInput.toFixed(3)}`;
+          displayCompletion = `${currency === 'CNY' ? '¥' : '$'}${numCompletion.toFixed(3)}`;
           content = (
             <div className="space-y-1">
               <div className="text-gray-700">
-                {t('提示')} ${inputRatioPrice.toFixed(3)} / 1M tokens
+                {t('提示')} {displayInput} / 1{unitLabel} tokens
               </div>
               <div className="text-gray-700">
-                {t('补全')} ${completionRatioPrice.toFixed(3)} / 1M tokens
+                {t('补全')} {displayCompletion} / 1{unitLabel} tokens
               </div>
             </div>
           );
         } else {
-          let price = parseFloat(text) * groupRatio[selectedGroup];
+          let priceUSD = parseFloat(text) * groupRatio[selectedGroup];
+          let displayVal = displayPrice(priceUSD);
           content = (
             <div className="text-gray-700">
-              {t('模型价格')}：${price.toFixed(3)}
+              {t('模型价格')}：{displayVal}
             </div>
           );
         }
@@ -365,7 +434,6 @@ const ModelPricing = () => {
                     {category.label}
                     <Tag
                       color={activeKey === key ? 'red' : 'grey'}
-                      size='small'
                       shape='circle'
                     >
                       {modelCount}
@@ -409,7 +477,6 @@ const ModelPricing = () => {
             onCompositionEnd={handleCompositionEnd}
             onChange={handleChange}
             showClear
-            size="large"
           />
         </div>
         <Button
@@ -419,13 +486,33 @@ const ModelPricing = () => {
           onClick={() => copyText(selectedRowKeys)}
           disabled={selectedRowKeys.length === 0}
           className="!bg-blue-500 hover:!bg-blue-600 text-white"
-          size="large"
         >
           {t('复制选中模型')}
         </Button>
+
+        {/* 充值价格显示开关 */}
+        <Space align="center">
+          <span>{t('以充值价格显示')}</span>
+          <Switch
+            checked={showWithRecharge}
+            onChange={setShowWithRecharge}
+            size="small"
+          />
+          {showWithRecharge && (
+            <Select
+              value={currency}
+              onChange={setCurrency}
+              size="small"
+              style={{ width: 100 }}
+            >
+              <Select.Option value="USD">USD ($)</Select.Option>
+              <Select.Option value="CNY">CNY (¥)</Select.Option>
+            </Select>
+          )}
+        </Space>
       </div>
     </Card>
-  ), [selectedRowKeys, t]);
+  ), [selectedRowKeys, t, showWithRecharge, currency]);
 
   const ModelTable = useMemo(() => (
     <Card className="!rounded-xl overflow-hidden" bordered={false}>
@@ -499,7 +586,7 @@ const ModelPricing = () => {
                               <div className="flex items-center">
                                 <AlertCircle size={14} className="mr-1.5 flex-shrink-0" />
                                 <span className="truncate">
-                                  {t('未登录，使用默认分组倍率')}: {groupRatio['default']}
+                                  {t('未登录，使用默认分组倍率：')}{groupRatio['default']}
                                 </span>
                               </div>
                             )}

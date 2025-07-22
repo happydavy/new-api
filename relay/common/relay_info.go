@@ -97,9 +97,9 @@ type RelayInfo struct {
 	IsFirstRequest       bool
 	AudioUsage           bool
 	ReasoningEffort      string
-	ChannelSetting       map[string]interface{}
+	ChannelSetting       dto.ChannelSettings
 	ParamOverride        map[string]interface{}
-	UserSetting          map[string]interface{}
+	UserSetting          dto.UserSetting
 	UserEmail            string
 	UserQuota            int
 	RelayFormat          string
@@ -180,16 +180,18 @@ func GenRelayInfoResponses(c *gin.Context, req *dto.OpenAIResponsesRequest) *Rel
 	}
 	if len(req.Tools) > 0 {
 		for _, tool := range req.Tools {
-			info.ResponsesUsageInfo.BuiltInTools[tool.Type] = &BuildInToolInfo{
-				ToolName:  tool.Type,
+			toolType := common.Interface2String(tool["type"])
+			info.ResponsesUsageInfo.BuiltInTools[toolType] = &BuildInToolInfo{
+				ToolName:  toolType,
 				CallCount: 0,
 			}
-			switch tool.Type {
+			switch toolType {
 			case dto.BuildInToolWebSearchPreview:
-				if tool.SearchContextSize == "" {
-					tool.SearchContextSize = "medium"
+				searchContextSize := common.Interface2String(tool["search_context_size"])
+				if searchContextSize == "" {
+					searchContextSize = "medium"
 				}
-				info.ResponsesUsageInfo.BuiltInTools[tool.Type].SearchContextSize = tool.SearchContextSize
+				info.ResponsesUsageInfo.BuiltInTools[toolType].SearchContextSize = searchContextSize
 			}
 		}
 	}
@@ -213,8 +215,7 @@ func GenRelayInfoImage(c *gin.Context) *RelayInfo {
 func GenRelayInfo(c *gin.Context) *RelayInfo {
 	channelType := common.GetContextKeyInt(c, constant.ContextKeyChannelType)
 	channelId := common.GetContextKeyInt(c, constant.ContextKeyChannelId)
-	channelSetting := common.GetContextKeyStringMap(c, constant.ContextKeyChannelSetting)
-	paramOverride := common.GetContextKeyStringMap(c, constant.ContextKeyParamOverride)
+	paramOverride := common.GetContextKeyStringMap(c, constant.ContextKeyChannelParamOverride)
 
 	tokenId := common.GetContextKeyInt(c, constant.ContextKeyTokenId)
 	tokenKey := common.GetContextKeyString(c, constant.ContextKeyTokenKey)
@@ -227,11 +228,10 @@ func GenRelayInfo(c *gin.Context) *RelayInfo {
 
 	info := &RelayInfo{
 		UserQuota:         common.GetContextKeyInt(c, constant.ContextKeyUserQuota),
-		UserSetting:       common.GetContextKeyStringMap(c, constant.ContextKeyUserSetting),
 		UserEmail:         common.GetContextKeyString(c, constant.ContextKeyUserEmail),
 		isFirstResponse:   true,
 		RelayMode:         relayconstant.Path2RelayMode(c.Request.URL.Path),
-		BaseUrl:           common.GetContextKeyString(c, constant.ContextKeyBaseUrl),
+		BaseUrl:           common.GetContextKeyString(c, constant.ContextKeyChannelBaseUrl),
 		RequestURLPath:    c.Request.URL.String(),
 		ChannelType:       channelType,
 		ChannelId:         channelId,
@@ -246,12 +246,12 @@ func GenRelayInfo(c *gin.Context) *RelayInfo {
 		OriginModelName:   common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 		UpstreamModelName: common.GetContextKeyString(c, constant.ContextKeyOriginalModel),
 		//RecodeModelName:   c.GetString("original_model"),
-		IsModelMapped:     false,
-		ApiType:           apiType,
-		ApiVersion:        c.GetString("api_version"),
-		ApiKey:            strings.TrimPrefix(c.Request.Header.Get("Authorization"), "Bearer "),
-		Organization:      c.GetString("channel_organization"),
-		ChannelSetting:    channelSetting,
+		IsModelMapped: false,
+		ApiType:       apiType,
+		ApiVersion:    c.GetString("api_version"),
+		ApiKey:        common.GetContextKeyString(c, constant.ContextKeyChannelKey),
+		Organization:  c.GetString("channel_organization"),
+
 		ChannelCreateTime: c.GetInt64("channel_create_time"),
 		ParamOverride:     paramOverride,
 		RelayFormat:       RelayFormatOpenAI,
@@ -277,6 +277,16 @@ func GenRelayInfo(c *gin.Context) *RelayInfo {
 	if streamSupportedChannels[info.ChannelType] {
 		info.SupportStreamOptions = true
 	}
+
+	channelSetting, ok := common.GetContextKeyType[dto.ChannelSettings](c, constant.ContextKeyChannelSetting)
+	if ok {
+		info.ChannelSetting = channelSetting
+	}
+	userSetting, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting)
+	if ok {
+		info.UserSetting = userSetting
+	}
+
 	return info
 }
 

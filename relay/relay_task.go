@@ -37,9 +37,9 @@ func RelayTaskSubmit(c *gin.Context, relayMode int) (taskErr *dto.TaskError) {
 		return
 	}
 
-	modelName := service.CoverTaskActionToModelName(platform, relayInfo.Action)
-	if platform == constant.TaskPlatformKling {
-		modelName = relayInfo.OriginModelName
+	modelName := relayInfo.OriginModelName
+	if modelName == "" {
+		modelName = service.CoverTaskActionToModelName(platform, relayInfo.Action)
 	}
 	modelPrice, success := ratio_setting.GetModelPrice(modelName, true)
 	if !success {
@@ -139,8 +139,17 @@ func RelayTaskSubmit(c *gin.Context, relayMode int) (taskErr *dto.TaskError) {
 				if hasUserGroupRatio {
 					other["user_group_ratio"] = userGroupRatio
 				}
-				model.RecordConsumeLog(c, relayInfo.UserId, relayInfo.ChannelId, 0, 0,
-					modelName, tokenName, quota, logContent, relayInfo.TokenId, userQuota, 0, false, relayInfo.UsingGroup, other)
+				model.RecordConsumeLog(c, relayInfo.UserId, model.RecordConsumeLogParams{
+					ChannelId: relayInfo.ChannelId,
+					ModelName: modelName,
+					TokenName: tokenName,
+					Quota:     quota,
+					Content:   logContent,
+					TokenId:   relayInfo.TokenId,
+					UserQuota: userQuota,
+					Group:     relayInfo.UsingGroup,
+					Other:     other,
+				})
 				model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, quota)
 				model.UpdateChannelUsedQuota(relayInfo.ChannelId, quota)
 			}
